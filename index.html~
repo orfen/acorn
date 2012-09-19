@@ -5,9 +5,7 @@
     <script src="jquery.couch.extended.js"></script>    
     <script src="kernel.js"></script>
     <script src="test.js"></script>
-
-
+	kernel.init("user", function(){});
 </head>
 <body>
-<script type="text/javascript">kernel.init("user", function(){});</script>
 </body>
