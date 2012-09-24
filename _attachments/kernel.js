@@ -142,18 +142,18 @@ var kernel = {
             returnnode.value = {};
             returnnode.value.rev = json.rev;
 
-            var parentnode = this.getNode(l_node)
+            var parentnode = kernel.getNode(l_node)
             parentnode.children.splice(index, 0, returnnode);
             parentnode.doc.parentTo.splice(index, 0, returnnode.id);
             returnnode.parent = parentnode;
             returnnode.children = [];
 
-            kernel.paths[returnnode.id] = this.buildpath(returnnode);
-            returnnode.path = this.buildpath(returnnode);
+            kernel.paths[returnnode.id] = kernel.buildpath(returnnode);
+            returnnode.path = kernel.buildpath(returnnode);
 
-            $.couch.db(this.DATABASE).openDoc(parentnode.id).then(function (json) {
+            $.couch.db(kernel.DATABASE).openDoc(parentnode.id).then(function (json) {
                 json['parentTo'].splice(index, 0, n + "n");
-                $.couch.db(this.DATABASE).saveDoc(json).then(function () {
+                $.couch.db(kernel.DATABASE).saveDoc(json).then(function () {
                     callbackf(returnnode);
                 });
             });
