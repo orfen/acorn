@@ -125,38 +125,35 @@ var kernel = {
         return findChild(kernel.tree, 0);
     },
 
-    getChildren: function (node) { //currently accepts path ...bad
+    getChildren: function (node) { 
         l_node = this.getNode(node);
         return l_node.children;
     },
 
     addChildNodeOnly: function (l_node, index, contentID, callbackf) {
-        var thiskernel = this;
         var returnnode = {};
         n = contentID;
-        var nodevalue = "{ \"nodeID\":\"" + n + "n" + "\",\"parentTo\":[],\"content\":\"" + n + "\"}"
-        var obj = jQuery.parseJSON(nodevalue || "{}");
-        if (typeof obj !== "object" || $.isArray(obj)) {
-            obj = {};
-        }
-        $.couch.db(this.DATABASE).saveDoc(obj).then(function (json) {
-            returnnode.doc = obj;
+        nodeValue = {'nodeID': n + 'n', 'parentTo': [], 'content': n + 'n'};
+
+        $.couch.db(this.DATABASE).saveDoc(nodeValue).then(function (json) {
+            returnnode.doc = nodeValue;
             returnnode.id = json.id;
             returnnode.key = json.id;
             returnnode.value = {};
             returnnode.value.rev = json.rev;
-            var parentnode = thiskernel.getNode(l_node)
+
+            var parentnode = this.getNode(l_node)
             parentnode.children.splice(index, 0, returnnode);
             parentnode.doc.parentTo.splice(index, 0, returnnode.id);
             returnnode.parent = parentnode;
             returnnode.children = [];
 
-            kernel.paths[returnnode.id] = thiskernel.buildpath(returnnode);
-            returnnode.path = thiskernel.buildpath(returnnode);
+            kernel.paths[returnnode.id] = this.buildpath(returnnode);
+            returnnode.path = this.buildpath(returnnode);
 
-            $.couch.db(thiskernel.DATABASE).openDoc(parentnode.id).then(function (json) {
+            $.couch.db(this.DATABASE).openDoc(parentnode.id).then(function (json) {
                 json['parentTo'].splice(index, 0, n + "n");
-                $.couch.db(thiskernel.DATABASE).saveDoc(json).then(function () {
+                $.couch.db(this.DATABASE).saveDoc(json).then(function () {
                     callbackf(returnnode);
                 });
             });
@@ -170,17 +167,12 @@ var kernel = {
         var thiskernel = this;
         var d = new Date();
         var n = d.getTime() + "";
-        //escapecontent?
-        var contentvalue = "{ \"contentID\":\"" + n + "\",\"html\":\"" + content + "\"}"
-        var obj2 = jQuery.parseJSON(contentvalue || "{}");
-        if (typeof obj2 !== "object" || $.isArray(obj2)) {
-            obj2 = {};
-        }
+        newChild = {'contentID': n, 'html': content};
 
         thensave = function (savednode) {
-            $.couch.db(thiskernel.DATABASE).saveDoc(obj2).then(function (json) {
+            $.couch.db(thiskernel.DATABASE).saveDoc(newChild).then(function (json) {
                 savednode.content = {}
-                savednode.content.doc = obj2;
+                savednode.content.doc = newChild;
                 savednode.content.id = json.id;
                 savednode.content.key = json.id;
                 savednode.content.value = {};
