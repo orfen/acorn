@@ -98,7 +98,9 @@ var kernel = {
         return kernel.initcallback();
     },
 
-    getNode: function (path) { // need to seperate into pathToNode function
+    getNode: function(node) {
+        path = this.paths[node]
+         
         path = path.split("/");
         path = path.splice(0, path.length - 1);
         if (path.length == 0) return kernel.tree;
@@ -106,15 +108,18 @@ var kernel = {
         function findChild(node, index) {
             var result = null;
             var id = path[index];
+
             $.each(node.children, function () {
                 if (this.doc._id == id) {
                     result = this;
                     return false;
                 }
             });
+
             if (++index == path.length) {
                 return result;
             }
+
             return findChild(result, index);
         }
         return findChild(kernel.tree, 0);
@@ -248,7 +253,6 @@ var kernel = {
     },
     
     deleteNode: function (node, callbackf) { //not recursive, promotes immediate sibling at index 0
-
         //loose content will need purging by application, unless deleteNodeAndContent is used
         if (node.id == this.ROOT) return callbackf();
         thiskernel = this;
