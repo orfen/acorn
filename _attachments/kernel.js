@@ -72,29 +72,35 @@ var kernel = {
                     }
                 });
 
-                if (!childnode) return;
+                if (!childnode)
+                    return;
                 childnode.parent = node;
 
                 var childcontent;
                 childnode.path = kernel.paths[childnode.id] = kernel.buildpath(childnode);
                 $.each(data.rows, function () {
-                    if (this.doc.contentID == childnode.doc.content) childcontent = this;
+                    if (this.doc.contentID == childnode.doc.content)
+                        childcontent = this;
                     //escape each
                 });
                 childnode.content = childcontent;
                 kernel.buildtree(childnode, data);
             });
+
             return (node);
         }
     },
 
     buildpath: function (node) {
-        if (node.parent != node) return kernel.buildpath(node.parent) + node.id + "/"
+        if (node.parent != node)
+            return kernel.buildpath(node.parent) + node.id + "/"
+
         return "" //node.id
     },
 
     callback: function (data) {
         kernel.tree = kernel.buildtree(data.rows[0], data);
+
         return kernel.initcallback();
     },
 
@@ -112,21 +118,23 @@ var kernel = {
             $.each(node.children, function () {
                 if (this.doc._id == id) {
                     result = this;
+
                     return false;
                 }
             });
 
-            if (++index == path.length) {
+            if (++index == path.length) 
                 return result;
-            }
 
             return findChild(result, index);
         }
+
         return findChild(kernel.tree, 0);
     },
 
     getChildren: function (node) { 
         l_node = this.getNode(node);
+
         return l_node.children;
     },
 
@@ -159,8 +167,7 @@ var kernel = {
             });
         })
 
-        return
-
+        return;
     },
 
     addChild: function (l_node, index, content, callbackff) {
@@ -206,6 +213,7 @@ var kernel = {
             });
             console.log(data);
         });
+
         return;
     },
 
@@ -221,7 +229,6 @@ var kernel = {
 
         });
 
-
         $.couch.db(this.DATABASE).openDoc(newparentnode.id).then(function (json) { //assign new parent (db first)
             json['parentTo'].splice(newindex, 0, node.id);
             $.couch.db(thiskernel.DATABASE).saveDoc(json);
@@ -231,7 +238,6 @@ var kernel = {
 
         });
 
-
         function updateallpaths(thisnode) { //recursively *update* paths of that node and children
             kernel.paths[thisnode.doc._id] = kernel.buildpath(thisnode);
             if (this.doc.children.length) {
@@ -240,6 +246,7 @@ var kernel = {
                 });
             }
         }
+
         updateallpaths(node);
 
     },
@@ -251,7 +258,6 @@ var kernel = {
         parent = node.parent;
         index = node.parent.children.indexOf(node);
         $.couch.db(this.DATABASE).openDoc(node.parent.id).then(function (json) { //remove from parent (db first)
-
             json['parentTo'].splice(index, 1);
             $.couch.db(thiskernel.DATABASE).saveDoc(json).then(function () {
                 parent.children.splice(index, 1);
@@ -261,9 +267,6 @@ var kernel = {
                     $.couch.db(kernel.DATABASE).removeDoc(doc).then(callbackf(parent));
                 });
             });
-
-
-
         });
         return;
 
