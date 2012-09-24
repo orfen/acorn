@@ -19,7 +19,7 @@ If installing in a new DB, create a doc for 000000root node
 and 000000root's content:
 
 {
-    "html": "ROOT!<br/><br/><br/><img src='http://localhost:5984/_utils/image/logo.png'><br/><br/>[Insert] new child.<br/>[Enter] new sibling.<br/>[Backspace] to edit then [Enter] when done.<br/>[Delete] to delete!",
+    html: "ROOT!<br/><br/><br/><img src='http://localhost:5984/_utils/image/logo.png'><br/><br/>[Insert] new child.<br/>[Enter] new sibling.<br/>[Backspace] to edit then [Enter] when done.<br/>[Delete] to delete!",
    "contentID": "rootcontent"
 }
 
@@ -58,9 +58,8 @@ var kernel = {
 				if(node.id == "000000root")
 					node.parent = node;
 			           $.each(data.rows, function(){
-			               if(this.doc.contentID == node.doc.content){
+			               if(this.doc.contentID == node.doc.content)
 			                   node.content = this;
-					}
 			           });
 
 			   if(node.doc.parentTo){
@@ -72,7 +71,6 @@ var kernel = {
 			               if(this.doc.nodeID == childnodeID) {
 			                   node.children.push(this);
 			                   childnode = this;
-						//escape each
 			               }
 			           });
 				
@@ -85,7 +83,6 @@ var kernel = {
 			           $.each(data.rows, function(){
 			               if(this.doc.contentID == childnode.doc.content)
 			                   childcontent = this;
-					//escape each
 			           });
 			           childnode.content = childcontent;
 			           kernel.buildtree(childnode,data);
@@ -151,7 +148,7 @@ var kernel = {
 				kernel.paths[returnnode.id] = thiskernel.buildpath(returnnode);
 				returnnode.path = thiskernel.buildpath(returnnode);
 
-				$.couch.db(thiskernel.DATABASE).openDoc(parentnode.id).then(function(json) {
+				$.couch.db(thiskernel.DATABASE).openDoc(thiskernel.getNode(l_node).id).then(function(json) {
 				      	json['parentTo'].splice(index,0,n+"n");
 				      $.couch.db(thiskernel.DATABASE).saveDoc(json).then(function(){callbackf(returnnode);});
 				});
@@ -257,7 +254,7 @@ var kernel = {
 					parent.doc.parentTo.splice(index,1);
 
 					$.couch.db(kernel.DATABASE).openDoc(node.id).then(function(doc) {	//remove from db
-						$.couch.db(kernel.DATABASE).removeDoc(doc).then(callbackf(parent));
+						$.couch.db(kernel.DATABASE).removeDoc(doc).then(callbackf);
 					});
 				});
 
