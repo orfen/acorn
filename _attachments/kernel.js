@@ -32,9 +32,8 @@ var kernel = {
     tree: null,
     paths: {},
     initcallback: function () {},
+
     init: function (DATABASE, initcallback) {
-
-
         this.DATABASE = DATABASE;
         this.initcallback = initcallback
 
@@ -45,15 +44,13 @@ var kernel = {
             this.reflectChanges(data);
         }
 
-
-
-
         this.db = $.couch.db(this.DATABASE);
         this.db.allDocs(this.OPTS).then(this.callback);
 
         //$changes.stop();
         return;
     },
+
     buildtree: function (node, data) {
         if (node.id == "000000root") node.parent = node;
         $.each(data.rows, function () {
@@ -90,14 +87,17 @@ var kernel = {
             return (node);
         }
     },
+
     buildpath: function (node) {
         if (node.parent != node) return kernel.buildpath(node.parent) + node.id + "/"
         return "" //node.id
     },
+
     callback: function (data) {
         kernel.tree = kernel.buildtree(data.rows[0], data);
         return kernel.initcallback();
     },
+
     getNode: function (path) { // need to seperate into pathToNode function
         path = path.split("/");
         path = path.splice(0, path.length - 1);
@@ -119,10 +119,12 @@ var kernel = {
         }
         return findChild(kernel.tree, 0);
     },
+
     getChildren: function (node) { //currently accepts path ...bad
         l_node = this.getNode(node);
         return l_node.children;
     },
+
     addChildNodeOnly: function (l_node, index, contentID, callbackf) {
         var thiskernel = this;
         var returnnode = {};
@@ -158,6 +160,7 @@ var kernel = {
         return
 
     },
+
     addChild: function (l_node, index, content, callbackff) {
         var thiskernel = this;
         var d = new Date();
@@ -194,6 +197,7 @@ var kernel = {
 
         return;
     },
+
     reflectChanges: function (data) {
         console.log(data);
 
@@ -207,6 +211,7 @@ var kernel = {
         });
         return;
     },
+
     moveNode: function (node, newparentnode, newindex) {
         $.couch.db(this.DATABASE).openDoc(node.doc.parent.id).then(function (json) { //close old parent (db first)
             parent = node.doc.parent;
@@ -241,6 +246,7 @@ var kernel = {
         updateallpaths(node);
 
     },
+    
     deleteNode: function (node, callbackf) { //not recursive, promotes immediate sibling at index 0
 
         //loose content will need purging by application, unless deleteNodeAndContent is used
@@ -269,10 +275,13 @@ var kernel = {
 
         //remove from DOM ?? - not bothering for now
     },
+    
     deleteContent: function (content) {
-        //delete content (db first)			
+        //delete content (db first)         
     },
+
     deleteAndContent: function (content) {
         //future - will need to check tree for all refs, or maintain array list of duplicates
     }
+    
 };
