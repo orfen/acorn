@@ -12,9 +12,7 @@ If installing in a new DB, create a doc for 000000root node
    "parentTo": [
    ],
    "content": "rootcontent"
-}
-
-
+} 
 and 000000root's content:
 
 {
@@ -22,22 +20,29 @@ and 000000root's content:
    "contentID": "rootcontent"
 }
 
+
+
 */
 var kernel = {
-    DATABASE: "",
+    DATABASE: "",//want to get rid of this
+    DATABASEPATHS: {},
+    NESTMAX: 3,
     OPTS: {
         include_docs: "true"
     },
     ROOT: "000000root",
-    tree: null,
-    paths: {},
+    tree: {},
     initcallback: function () {},
+    ajaxcallback: function () {},
 
-    init: function (DATABASE, initcallback) {
+    init: function (DATABASE, initcallback, ajaxcallback) {
         this.DATABASE = DATABASE;
-        this.initcallback = initcallback
+        this.initcallback = initcallback;
+        this.ajaxcallback = ajaxcallback;
 
-        this.paths["000000root"] = "";
+        //this.paths["000000root"] = "";
+       // kernel.DATABASEPATHS[this.DATABASE] = {"000000root":""};//.paths["000000root"] = "";
+
         var $changes = $.couch.db(this.DATABASE).changes();
         $changes.onChange = function (data) {
             console.log(data);
@@ -45,68 +50,87 @@ var kernel = {
         }
 
         this.db = $.couch.db(this.DATABASE);
-        this.db.allDocs(this.OPTS).then(this.callback);
+        this.db.allDocs(this.OPTS).then( function(data){ kernel.tree = kernel.callback(data,0,kernel.DATABASE);kernel.tree.parent = kernel.tree; kernel.initcallback()} );
 
         //$changes.stop();
         return;
     },
 
-    buildtree: function (node, data) {
-        if (node.id == "000000root") node.parent = node;
+    callback: function (data, nest, db) {
+        return kernel.buildtree(data.rows[0], data, nest, db);
+    },
+
+
+    buildtree: function (node, data, nest, db) {
+
+        if (node.id == "000000root")
+            node.parent = node;
+        node.db = db
+        node.nest = nest;
+        if(!kernel.DATABASEPATHS[node.db])
+            kernel.DATABASEPATHS[node.db] = {};
+            
+        node.path = kernel.DATABASEPATHS[node.db][node.id] = kernel.buildpath(node);      
+        
         $.each(data.rows, function () {
             if (this.doc.contentID == node.doc.content) {
                 node.content = this;
             }
         });
+        
+        if(!node.content)
+            node.content = { "doc": {"contentID":"nullcontent","html":"NULL CONTENT - cannot edit!"}};
 
-        if (node.doc.parentTo) {
-            node.children = [];
-            $.each(node.doc.parentTo, function () {
-                childnodeID = this;
-                var childnode;
-                $.each(data.rows, function () {
-                    if (this.doc.nodeID == childnodeID) {
-                        node.children.push(this);
-                        childnode = this;
-                        //escape each
-                    }
-                });
 
-                if (!childnode)
-                    return;
-                childnode.parent = node;
-
-                var childcontent;
-                childnode.path = kernel.paths[childnode.id] = kernel.buildpath(childnode);
-                $.each(data.rows, function () {
-                    if (this.doc.contentID == childnode.doc.content)
-                        childcontent = this;
+        node.children = [];
+        $.each(node.doc.parentTo, function () {
+            childnodeID = this;
+            var childnode;
+            $.each(data.rows, function () {
+                if (this.doc.nodeID == childnodeID) {
+                    node.children.push(this);
+                    childnode = this;
                     //escape each
-                });
-                childnode.content = childcontent;
-                kernel.buildtree(childnode, data);
+                }
             });
 
-            return (node);
+            if (!childnode)
+                return;
+            childnode.parent = node;
+
+          //  var childcontent;
+          // childnode.db = node.db //means repitition, yes - oh well
+
+            /*$.each(data.rows, function () {			///why was this even here! (already takes place above)
+                if (this.doc.contentID == childnode.doc.content)
+                    childcontent = this;
+                //escape each
+            });
+            childnode.content = childcontent;*/
+
+            kernel.buildtree(childnode, data, nest, db);
+
+        });
+        
+        if (node.doc.parentTo.length == 0 && node.content.doc.html == "userdup2"  && nest < kernel.NESTMAX) {
+             //begins background ajax request for the other trees, need to prevent UI freaking out
+             $.couch.db(node.content.doc.html).allDocs(kernel.OPTS).then( function(data){ node.children[0] = kernel.callback(data,nest + 1,node.content.doc.html);node.children[0].parent = node;kernel.ajaxcallback(node);} );
         }
+
+        return node;
+
     },
 
     buildpath: function (node) {
-        if (node.parent != node)
+        if (node.parent != node && node.parent.db == node.db)
             return kernel.buildpath(node.parent) + node.id + "/"
 
         return "" //node.id
     },
 
-    callback: function (data) {
-        kernel.tree = kernel.buildtree(data.rows[0], data);
-
-        return kernel.initcallback();
-    },
-
     getNode: function(node) {
-        path = this.paths[node]
-         
+        path = node;//this.paths[node]
+
         path = path.split("/");
         path = path.splice(0, path.length - 1);
         if (path.length == 0) return kernel.tree;
@@ -141,7 +165,7 @@ var kernel = {
     addChildNodeOnly: function (l_node, index, contentID, callbackf) {
         var returnnode = {};
         n = contentID;
-        nodeValue = {'nodeID': n + 'n', 'parentTo': [], 'content': n + 'n'};
+        nodeValue = {'nodeID': n + 'n', 'parentTo': [], 'content': n }; //José - you put 'content': n + 'n' !!!!!!!! (thanks for wasting 20 minutes of my life :P)
 
         $.couch.db(this.DATABASE).saveDoc(nodeValue).then(function (json) {
             returnnode.doc = nodeValue;
@@ -156,8 +180,7 @@ var kernel = {
             returnnode.parent = parentnode;
             returnnode.children = [];
 
-            kernel.paths[returnnode.id] = kernel.buildpath(returnnode);
-            returnnode.path = kernel.buildpath(returnnode);
+            returnnode.path = kernel.DATABASEPATHS[selectrect.db][returnnode.id] = kernel.buildpath(returnnode);
 
             $.couch.db(kernel.DATABASE).openDoc(parentnode.id).then(function (json) {
                 json['parentTo'].splice(index, 0, n + "n");
@@ -184,6 +207,7 @@ var kernel = {
                 savednode.content.key = json.id;
                 savednode.content.value = {};
                 savednode.content.value.rev = json.rev;
+                console.log(savednode);
                 callbackff(savednode); //*/ - this was cause of HUGE problems!! never forget
             });
         }
@@ -194,9 +218,9 @@ var kernel = {
 
     saveNodeContent: function (node) {
         thiskernel = this;
-        $.couch.db(this.DATABASE).openDoc(node.content.id).then(function (json) {
+        $.couch.db(node.db).openDoc(node.content.id).then(function (json) {
             json['html'] = node.content.doc.html;
-            $.couch.db(thiskernel.DATABASE).saveDoc(json);
+            $.couch.db(node.db).saveDoc(json);
         });
 
         return;
