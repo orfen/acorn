@@ -6,39 +6,34 @@ https://github.com/substack/js-traverse/
 
 
 
-If installing in a new DB, create a doc for 000000root node
-
-{
-   "parentTo": [
-   ],
-   "content": "rootcontent"
-} 
-and 000000root's content:
-
-{
-    "html": "ROOT!<br/><br/><br/><img src='http://localhost:5984/_utils/image/logo.png'><br/><br/>[Insert] new child.<br/>[Enter] new sibling.<br/>[Backspace] to edit then [Enter] when done.<br/>[Delete] to delete!",
-   "contentID": "rootcontent"
-}
-
-
 
 */
+
+
 var kernel = {
     DATABASE: "", //want to get rid of this
     DATABASEPATHS: {},
-    NESTMAX: 3,
+    NESTMAX: 1,
     OPTS: {
         include_docs: "true"
     },
     ROOT: "000000root",
+    //DATABASEPATHS: {}, - i may have been meaning to put something else here? (forgotten copypasta)
     tree: {},
+    subtrees: {},
+    user: "anon",
+    activervsID: "acornbundle",
     initcallback: function () {},
     ajaxcallback: function () {},
 
-    init: function (DATABASE, initcallback, ajaxcallback) {
+    init: function (DATABASE, initcallback, ajaxcallback, user, activervsID) {
         this.DATABASE = DATABASE;
         this.initcallback = initcallback;
         this.ajaxcallback = ajaxcallback;
+        if(user)
+            this.user = user;
+        if(activervsID)
+            this.activervsID = activervsID;         
 
         //this.paths["000000root"] = "";
         // kernel.DATABASEPATHS[this.DATABASE] = {"000000root":""};//.paths["000000root"] = "";
@@ -53,8 +48,8 @@ var kernel = {
         this.db = $.couch.db(this.DATABASE);
         this.db.allDocs(this.OPTS)
             .then(function (data) {
+      //       kernel.tree.parent = kernel.tree;
             kernel.tree = kernel.callback(data, 0, kernel.DATABASE);
-            kernel.tree.parent = kernel.tree;
             kernel.initcallback()
         });
 
@@ -69,7 +64,7 @@ var kernel = {
 
     buildtree: function (node, data, nest, db) {
 
-        if (node.id == "000000root") node.parent = node;
+        if (node.id == kernel.ROOT) node.parent = node;
         node.db = db
         node.nest = nest;
         if (!kernel.DATABASEPATHS[node.db]) kernel.DATABASEPATHS[node.db] = {};
@@ -119,15 +114,29 @@ var kernel = {
 
         });
 
-        if (node.doc.parentTo.length == 0 && node.content.doc.html == "userdup2" && nest < kernel.NESTMAX) {
-            //begins background ajax request for the other trees, need to prevent UI freaking out
-            $.couch.db(node.content.doc.html)
-                .allDocs(kernel.OPTS)
-                .then(function (data) {
-                node.children[0] = kernel.callback(data, nest + 1, node.content.doc.html);
-                node.children[0].parent = node;
-                kernel.ajaxcallback(node);
-            });
+        if (node.doc.parentTo.length == 0 && node.content.doc.link && nest < kernel.NESTMAX) {
+            if(window.location.origin == "http://" + node.content.doc.link.split('/')[2])
+                if((linkdb = node.content.doc.link.split('/')[3]) != node.db)
+                    $.couch.db(linkdb)
+                        .allDocs(kernel.OPTS)
+                        .then(function (data) {
+                        console.log(node.content.doc.link);
+                        kernel.subtrees[linkdb] = kernel.callback(data, nest + 1, linkdb);
+                        ajaxnode = kernel.getNodeFromDocID(kernel.getURLParameter("?" + node.content.doc.link.split('?')[1], "docID"), linkdb);
+                        if(ajaxnode)
+                        {
+                            console.log(ajaxnode.parent);
+                           console.log(kernel.subtrees[linkdb])
+                          //node.vischildren = [];
+                          //  node.vischildren[0] = ajaxnode;
+                           node.children[0] = ajaxnode;
+                           // node.vischildren[0].visparent = node; - treeware has to manage escaping, unfortunately!
+                            console.log(kernel.tree);
+                            kernel.ajaxcallback(node); //remember, still need to create ui response for ajax
+                        }
+                        else
+                            console.log("failed attempt to load: " + node.content.doc.link);
+                    });
         }
 
         return node;
@@ -140,12 +149,17 @@ var kernel = {
         return "" //node.id
     },
 
-    getNode: function (node) {
+    getNode: function (node, db) { // need to handle db and update references accordingly
         path = node; //this.paths[node]
 
         path = path.split("/");
         path = path.splice(0, path.length - 1);
-        if (path.length == 0) return kernel.tree;
+        
+        var thetree = kernel.tree
+        if(db)
+            thetree = kernel.subtrees[db];
+
+        if (path.length == 0) return thetree;
 
         function findChild(node, index) {
             var result = null;
@@ -164,7 +178,20 @@ var kernel = {
             return findChild(result, index);
         }
 
-        return findChild(kernel.tree, 0);
+        return findChild(thetree, 0);
+    },
+    
+    getNodeFromDocID: function (id, db) {
+
+        if(db)
+            return kernel.getNode(kernel.DATABASEPATHS[db][id],db);
+
+        for (var i in kernel.DATABASEPATHS)
+        {
+          if (nodepath = kernel.DATABASEPATHS[i][id])
+            return kernel.getNode(nodepath);
+        }
+        return false;
     },
 
     getChildren: function (node) {
@@ -180,9 +207,9 @@ var kernel = {
             'nodeID': n + 'n',
             'parentTo': [],
             'content': n
-        }; //José - you put 'content': n + 'n' !!!!!!!! (thanks for wasting 20 minutes of my life :P)
+        };
 
-        $.couch.db(this.DATABASE)
+        $.couch.db(kernel.getNode(l_node).db)
             .saveDoc(nodeValue)
             .then(function (json) {
             returnnode.doc = nodeValue;
@@ -196,14 +223,15 @@ var kernel = {
             parentnode.doc.parentTo.splice(index, 0, returnnode.id);
             returnnode.parent = parentnode;
             returnnode.children = [];
+            returnnode.db = kernel.getNode(l_node).db;
 
             returnnode.path = kernel.DATABASEPATHS[selectrect.db][returnnode.id] = kernel.buildpath(returnnode);
 
-            $.couch.db(kernel.DATABASE)
+            $.couch.db(kernel.getNode(l_node).db)
                 .openDoc(parentnode.id)
                 .then(function (json) {
                 json['parentTo'].splice(index, 0, n + "n");
-                $.couch.db(kernel.DATABASE)
+                $.couch.db(kernel.getNode(l_node).db)
                     .saveDoc(json)
                     .then(function () {
                     callbackf(returnnode);
@@ -220,11 +248,13 @@ var kernel = {
         var n = d.getTime() + "";
         newChild = {
             'contentID': n,
-            'html': content
+            'html': content,
+            'author': kernel.user,
+            'writtenFor': [kernel.activervsID]
         };
 
         thensave = function (savednode) {
-            $.couch.db(thiskernel.DATABASE)
+            $.couch.db(savednode.db)
                 .saveDoc(newChild)
                 .then(function (json) {
                 savednode.content = {}
@@ -318,20 +348,20 @@ var kernel = {
         thiskernel = this;
         parent = node.parent;
         index = node.parent.children.indexOf(node);
-        $.couch.db(this.DATABASE)
+        $.couch.db(node.db)
             .openDoc(node.parent.id)
             .then(function (json) { //remove from parent (db first)
             json['parentTo'].splice(index, 1);
-            $.couch.db(thiskernel.DATABASE)
+            $.couch.db(node.db)
                 .saveDoc(json)
                 .then(function () {
                 parent.children.splice(index, 1);
                 parent.doc.parentTo.splice(index, 1);
 
-                $.couch.db(kernel.DATABASE)
+                $.couch.db(node.db)
                     .openDoc(node.id)
                     .then(function (doc) { //remove from db
-                    $.couch.db(kernel.DATABASE)
+                    $.couch.db(node.db)
                         .removeDoc(doc)
                         .then(callbackf(parent));
                 });
@@ -350,6 +380,37 @@ var kernel = {
 
     deleteAndContent: function (content) {
         //future - will need to check tree for all refs, or maintain array list of duplicates
+    },
+    
+    navigate: function (l_node, rsvID) {
+        node = kernel.getNode(l_node);
+        window.open("/" + node.db + "/_design/" + rsvID + "/index.html?docID=" + node.id)
+    },
+    
+    
+    getURLParameter: function (str, name) {
+        return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(str)||[,""])[1].replace(/\+/g, '%20'))||null;
+    },
+    
+    installTree: function () {
+        /*
+        If installing in a new DB, create a doc for 000000root node
+
+        {
+           "parentTo": [
+           ],
+           "content": "rootcontent"
+        } 
+        and 000000root's content:
+
+        {
+            "html": "ROOT!<br/><br/><br/><img src='http://localhost:5984/_utils/image/logo.png'><br/><br/>[Insert] new child.<br/>[Enter] new sibling.<br/>[Backspace] to edit then [Enter] when done.<br/>[Delete] to delete!",
+           "contentID": "rootcontent"
+        }
+        root's content .rvsID decides if it is a acornbundle install (new user) or not - all db permissions for that user are prefixed by their user db name*/
+    },
+    
+    installUserTree: function () {
     }
 
 };
