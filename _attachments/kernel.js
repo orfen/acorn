@@ -9,7 +9,9 @@ https://github.com/substack/js-traverse/
 
 */
 
-function remap.Kernel(DATABASE, initcallback, ajaxcallback, user, activervsID) {
+function remap() {}
+
+remap.Kernel = function (DATABASE, initcallback, ajaxcallback, user, activervsID) {
    this.DATABASE = DATABASE;
    this.initcallback = initcallback;
    this.ajaxcallback = ajaxcallback;
@@ -41,7 +43,7 @@ function remap.Kernel(DATABASE, initcallback, ajaxcallback, user, activervsID) {
 }
 
 
-var remap.Kernel.prototype = {
+remap.Kernel.prototype = {
     DATABASE: "", //want to get rid of this
     DATABASEPATHS: {},
     NESTMAX: 1,
